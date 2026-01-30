@@ -1,6 +1,9 @@
 # multigate.py
 from __future__ import annotations
 from src.config import get_config, paths_from_config
+from src.viz import write_equity_curve_png
+from src.reporting import write_run_report_md
+
 
 import json
 import sqlite3
@@ -217,11 +220,8 @@ def insert_run_row(conn: sqlite3.Connection, run_id: str, spy: pd.DataFrame, rep
 # -------------------------
 
 def load_gate_pack(gates_dir: Path, gate_ids: List[str]) -> Dict:
-    # Try both possible import layouts (you’re in transition)
-    try:
-        import gate_eval as ge  # if you moved src files up one level already
-    except Exception:
-        from gulfchain_spy import gate_eval as ge  # if still under src/gulfchain_spy/
+    # Canonical import (no PYTHONPATH dependency)
+    import src.gate_eval as ge
 
     if hasattr(ge, "load_gate_pack"):
         return ge.load_gate_pack(gates_dir, gate_ids)
@@ -232,10 +232,8 @@ def load_gate_pack(gates_dir: Path, gate_ids: List[str]) -> Dict:
 
 
 def evaluate_gates(conn: sqlite3.Connection, run_id: str, gates: Dict, start_equity: float) -> None:
-    try:
-        import gate_eval as ge
-    except Exception:
-        from gulfchain_spy import gate_eval as ge
+    # Canonical import (no PYTHONPATH dependency)
+    import src.gate_eval as ge
 
     # optional helper
     if hasattr(ge, "ensure_tables"):
@@ -320,6 +318,16 @@ def main() -> int:
 
     # --- end signals ---
     evaluate_gates(conn, run_id, gates, start_equity=START_EQUITY)
+
+
+    # --- equity curve chart ---
+    equity_png = HERE / "runs" / "artifacts" / "charts" / f"{run_id}_equity.png"
+    write_equity_curve_png(conn, run_id, equity_png, START_EQUITY)
+
+    # --- report md ---
+    report_md = HERE / "runs" / "artifacts" / "reports" / f"{run_id}_multigate_report.md"
+    write_run_report_md(conn, run_id, report_md, start_equity=START_EQUITY)
+
 
     # write run row last
     report_path = str(HERE / "runs" / "artifacts" / "reports" / f"{run_id}_multigate_report.md")
