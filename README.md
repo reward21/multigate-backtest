@@ -53,7 +53,7 @@ Common knobs:
 > 🔎 Tip: `multigate.py` reads `runtime.start_equity` from `config.yaml` and will error if it’s missing (by design).
 
 
-### 2) `.env` (NOT committed ❌)
+### 2) `.env` (🔐 NOT committed ❌)
 
 Secrets go here (API keys/tokens). The repo includes `.env.example`.
 
