@@ -1,7 +1,16 @@
-pandas>=2.0
-numpy>=1.24
-pyarrow==23.0.0
-requests>=2.31
-matplotlib>=3.8
-PyYAML==6.0
-tabulate==0.9.0
+# Core data + math
+pandas>=2.2,<3.1
+numpy>=1.26,<3
+
+# Parquet support (needed if config points at .parquet)
+pyarrow>=14,<24
+
+# HTTP ingest helpers
+requests>=2.31,<3
+
+# Charts + reporting
+matplotlib>=3.8,<4
+tabulate>=0.9,<1
+
+# YAML config
+PyYAML>=6.0.3,<7
