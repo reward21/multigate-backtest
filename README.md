@@ -1,52 +1,116 @@
-# gulfchain — SPY 5m backtest + Multi‑Gate evaluator (local)
+# 🧪 multigate-backtest
 
-This repo is a **local working directory** for running a small SPY 5‑minute backtest and then scoring the resulting trades through a configurable **multi‑gate “Risk Gate”** system.
+A small, hackable **multi‑gate backtest harness** for SPY (5‑minute bars) that:
 
-## What you run (today)
-- **Runner:** `multigate.py`
-- **DB (current):** `runs/backtests.sqlite` (this is the one your script prints)
-- **Gate configs:** `gates/G0.json` … `gates/G5.json`
-- **Core logic:** `src/gate_eval.py`
+- 📄 loads run settings from `config.yaml`
+- 🔐 loads secrets from `.env` (**NOT committed**)
+- 🗃️ writes results to SQLite (`runs/backtests.sqlite`)
+- 🚦 evaluates gates **G0–G5** from JSON configs in `gates/`
 
-## Quick start
+This repo is currently focused on **plumbing correctness + gate evaluation**, not “final strategy alpha.”
+
+
+## ✅ What it does
+
+`multigate.py`:
+
+1. 📥 reads SPY 5m data from `paths.data_path` in `config.yaml`
+2. 🕒 normalizes timestamps and (optionally) enforces RTH rules from config
+3. 🧱 generates a minimal `signals` + `trades` stream for the run
+4. 🧪 evaluates each gate (G0–G5) and logs per‑signal decisions
+5. 📊 writes rollups/metrics
+
+
+## 🧰 Requirements
+
+- Python 3.x
+- `sqlite3` available on your system (macOS has it)
+- packages in `requirements.txt`
+
+Install:
+
 ```bash
-cd /Users/cole/projects/gulfchain
-
-# venv (create once)
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
 
-# run
+
+## ⚙️ Configuration
+
+### 1) `config.yaml` (committed ✅)
+
+This is the main editable entry point (paths, runtime settings, gate IDs, etc).
+
+Common knobs:
+
+- `paths.data_path`
+- `paths.db_path`
+- `runtime.start_equity`
+- `runtime.enforce_rth` + `runtime.rth_start` / `runtime.rth_end`
+- `gates.gate_ids`
+
+> 🔎 Tip: `multigate.py` reads `runtime.start_equity` from `config.yaml` and will error if it’s missing (by design).
+
+
+### 2) `.env` (NOT committed ❌)
+
+Secrets go here (API keys/tokens). The repo includes `.env.example`.
+
+Create your real `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and set (examples):
+
+- `ALPACA_KEY_ID=...`
+- `ALPACA_SECRET_KEY=...`
+- `WEBULL_ACCESS_TOKEN=...`
+
+✅ `.env` should be listed in `.gitignore` so it never gets pushed.
+
+
+## ▶️ Run
+
+From repo root:
+
+```bash
 export PYTHONPATH="$PWD/src"
 python multigate.py
 ```
 
-You’ll see:
+You should see something like:
+
 - `✅ Completed run_id=...`
-- `DB: /Users/cole/Projects/gulfchain/runs/backtests.sqlite`
+- `DB: /.../runs/backtests.sqlite`
 
-## Data expectations
-`multigate.py` reads your SPY data from `DATA_PATH` (defined near the top of the file).
-It expects a timestamp column named **`ts`** or **`timestamp`**. The runner:
-- parses timestamps as UTC,
-- converts to **America/New_York**,
-- filters to RTH (>= 09:45 ET, <= 16:00 ET),
-- normalizes into your internal 5‑minute format.
 
-## DB tables you should expect
+## 🗃️ DB tables you should expect
+
 Inside `runs/backtests.sqlite`:
-- `runs` — one row per run_id
-- `signals` — signal stream for a run (minimum columns used by gate_eval)
+
+- `runs` — one row per `run_id`
+- `signals` — signal stream for a run (minimum columns used by `gate_eval`)
 - `trades` — trades keyed by `(run_id, signal_id)`
-- `gate_decisions` — PASS/FAIL per gate per signal
-- `trades_pass` — PASS trades written by gate_eval
+- `gate_decisions` — PASS/FAIL per gate per signal (+ `denial_code` / `denial_detail`)
+- `trades_pass` — PASS trades written by gate evaluator
 - `gate_daily_stats`, `gate_metrics` — rollups
 
-Helpful sanity checks:
+
+## ✅ Helpful sanity checks
+
+Latest run id:
+
 ```bash
 RUN_ID="$(sqlite3 runs/backtests.sqlite "SELECT MAX(run_id) FROM runs;")"
+echo "$RUN_ID"
+```
 
+Counts:
+
+```bash
 sqlite3 -header -column runs/backtests.sqlite "
 SELECT
   (SELECT COUNT(*) FROM trades WHERE run_id='$RUN_ID')   AS trades,
@@ -57,24 +121,62 @@ SELECT
 "
 ```
 
-## Why you saw `G1_current_frozen.json` earlier
-That name usually means: “this gate file was **pinned/frozen** as the current reference config so it doesn’t get accidentally edited while other gates are being iterated.”
-In your codebase, `src/gate_eval.py` had a special-case that explicitly loaded `G1_current_frozen.json` for G1 (instead of `G1.json`). fileciteturn1file0L111-L111
+Gate PASS/FAIL breakdown:
 
-You’ve already renamed it to `gates/G1.json`. ✅  
-Just make sure you also update any remaining references (code + docs).
-
-## Legacy
-Anything old / superseded should live under `legacy/` (old SQLite files, old reports, old PNGs, old docs).
-
-Recommended legacy moves (optional):
 ```bash
-mkdir -p legacy/docs
-mv README_QUICKSTART.md legacy/docs/README_QUICKSTART_legacy.md
-mv README_CLEANED.md    legacy/docs/README_CLEANED_legacy.md
+sqlite3 -header -column runs/backtests.sqlite "
+SELECT gate_id,
+       SUM(CASE WHEN decision='PASS' THEN 1 ELSE 0 END) AS pass,
+       SUM(CASE WHEN decision='FAIL' THEN 1 ELSE 0 END) AS fail
+FROM gate_decisions
+WHERE run_id='$RUN_ID'
+GROUP BY gate_id
+ORDER BY gate_id;
+"
 ```
 
-## Notes on `.venv`
-Stopping the venv (“deactivate”) does **not** delete the `.venv/` folder — it stays on disk until you remove it.
-To leave the venv: `deactivate`
-To delete it: `rm -rf .venv`
+Denial reasons:
+
+```bash
+sqlite3 -header -column runs/backtests.sqlite "
+SELECT gate_id, denial_code, COUNT(*) AS n
+FROM gate_decisions
+WHERE run_id='$RUN_ID' AND decision='FAIL'
+GROUP BY gate_id, denial_code
+ORDER BY gate_id, n DESC;
+"
+```
+
+
+## 📝 Notes
+
+### Why you saw `G1_current_frozen.json` earlier
+
+That was a “pinned/frozen” naming convention from an earlier iteration (a safety guard so G1 didn’t get edited accidentally during experimentation).
+
+This repo standardizes on:
+
+- ✅ `gates/G1.json`
+
+If you renamed it, make sure any remaining references (code/docs) also point to `gates/G1.json`.
+
+
+## 🗂️ Repo layout
+
+- `multigate.py` — multi‑gate runner
+- `src/` — library code (config, ingest, features, gate eval, io)
+- `gates/` — gate JSON configs (G0–G5)
+- `runs/` — sqlite DB + generated artifacts (often gitignored)
+- `data/` — raw/processed data (usually gitignored)
+- `legacy/` — old sqlite files, old reports, old charts, etc.
+
+
+## 🧹 Local‑only / large files (recommended)
+
+Keep these out of GitHub (typically via `.gitignore`):
+
+- `.venv/`
+- `runs/backtests.sqlite` (usually)
+- `data/raw/` and `data/processed/` (usually)
+
+See `.gitignore` for the intended policy.
