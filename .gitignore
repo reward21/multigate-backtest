@@ -1,31 +1,41 @@
 cat > .gitignore <<'EOF'
-# Mac
-.DS_Store
-
-# Python
+# Python bytecode
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.pytest_cache/
-.mypy_cache/
+.Python
 
-# Virtual env
+# macOS
+.DS_Store
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Virtualenv
 .venv/
 venv/
+ENV/
+env/
 
-# Secrets
+# Secrets (NEVER commit)
 .env
 
-# Data + outputs (keep folder structure, not the heavy files)
-data/raw/
-data/processed/
+# Data
+# Ignore CSV/Parquet by default (prevents accidental huge commits)
 *.csv
 *.parquet
+
+# …but DO commit the sample dataset under /data
+!data/**/*.csv
+!data/**/*.parquet
 
 # Generated runs/artifacts
 runs/
 artifacts/
+
+# Backtests legacy outputs
 legacy/
 
 # Databases
@@ -39,9 +49,9 @@ legacy/
 *.jpeg
 *.pdf
 
-
 # private docs/archives
 /gc_docs
+EOF
 
-
-
+.DS_Store
+**/.DS_Store
