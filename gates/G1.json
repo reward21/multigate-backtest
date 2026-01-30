@@ -1,0 +1,82 @@
+{
+  "SPEC_VERSION": "RISK_GATE_MULTI_GATES_G0-G5_v1_2026-01-29",
+  "denial_reason_codes": [
+    "RISK_DAILY_KILL",
+    "RISK_PER_TRADE_CAP",
+    "RISK_OVERSIZE",
+    "RISK_MAX_TRADES",
+    "RISK_LOSS_STREAK",
+    "RISK_COOLDOWN",
+    "SESSION_PRE_945",
+    "SESSION_POST_300",
+    "SESSION_FORCE_FLAT",
+    "VOL_VIX_BLOCK",
+    "LIQ_SPREAD",
+    "LIQ_VOLUME",
+    "LIQ_OPEN_INTEREST",
+    "ADD_TO_LOSER_BLOCK",
+    "OVERNIGHT_BLOCK",
+    "REENTRY_BLOCK",
+    "AVG_DOWN_BLOCK"
+  ],
+  "gate_id": "G1",
+  "name": "Current Gate (As-Is, Frozen)",
+  "rules": {
+    "avg_down_policy": {
+      "enabled": true,
+      "mode": "DISALLOW"
+    },
+    "cooldown_minutes_after_stop": {
+      "enabled": true,
+      "minutes": 30
+    },
+    "daily_kill_switch": {
+      "enabled": true,
+      "max_intraday_dd_pct": 2.0
+    },
+    "denial_reason_map": "CANONICAL_1TO1",
+    "liquidity_filters": {
+      "enabled": false,
+      "max_spread_pct": null,
+      "min_open_interest": null,
+      "min_volume": null
+    },
+    "max_consecutive_losses": {
+      "enabled": true,
+      "max_losses": 3
+    },
+    "max_open_positions": {
+      "enabled": true,
+      "max_positions": 1
+    },
+    "max_trades_per_day": {
+      "enabled": true,
+      "max_trades": 5
+    },
+    "overnight_block": {
+      "enabled": true
+    },
+    "per_trade_risk_cap": {
+      "enabled": true,
+      "max_risk_pct_equity": 2.0,
+      "max_units": null
+    },
+    "reentry_policy": {
+      "enabled": true,
+      "max_reentries_per_day": 0
+    },
+    "session_rules": {
+      "enabled": true,
+      "force_flat_at": "15:30:00",
+      "no_entry_before": "09:45:00",
+      "no_new_entry_after": "15:00:00",
+      "tz": "US/Eastern"
+    },
+    "vix_regime_filter": {
+      "allowed_regimes": [
+        "NORMAL"
+      ],
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,45 @@
+# config.yaml  (repo root)
+
+paths:
+  db_path: "runs/backtests.sqlite"
+  data_path: "data/raw/alpaca/spy_5m.parquet"
+  gates_dir: "gates"
+  artifacts_dir: "runs/artifacts"
+
+runtime:
+  timezone: "America/New_York"
+  enforce_rth: true
+  rth_start: "09:45"
+  rth_end: "16:00"
+  start_equity: $100,000
+  strategy_version: "MULTIGATE_BASELINE_v1"
+
+gates:
+  gate_ids: ["G0", "G1", "G2", "G3", "G4", "G5"]
+  spec_version: "RISK_GATE_MULTI_GATES_G0-G5_v1_2026-01-29"
+
+  # Optional: override anything inside a gate json without editing the json
+  overrides:
+    G1:
+      rules:
+        vix_regime_filter:
+          enabled: true
+          allowed_regimes: ["LOW","MID","HIGH"]   # example
+        session_rules:
+          enabled: true
+          no_entry_before: "09:45"
+          no_new_entry_after: "15:55"
+
+data_features:
+  # “open everything” defaults
+  compute_vix_regime: true
+  attach_features_json: true
+
+api:
+  alpaca:
+    enabled: false
+    key_id_env: "ALPACA_KEY_ID"
+    secret_key_env: "ALPACA_SECRET_KEY"
+  webull:
+    enabled: false
+    access_token_env: "WEBULL_ACCESS_TOKEN"

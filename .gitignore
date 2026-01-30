@@ -1,0 +1,47 @@
+cat > .gitignore <<'EOF'
+# Mac
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Data + outputs (keep folder structure, not the heavy files)
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# Generated runs/artifacts
+runs/
+artifacts/
+legacy/
+
+# Databases
+*.sqlite
+*.sqlite3
+
+# Archives / media outputs
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+
+# private docs/archives
+/gc_docs
+
+
+
