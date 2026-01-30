@@ -1,11 +1,11 @@
 # 🧪 multigate-backtest
 
-A small, hackable **multi‑gate backtest harness** for SPY (5‑minute bars) that:
+A small, hackable **multi‑gate backtest harness** that:
 
 - 📄 loads run settings from `config.yaml`
 - 🔐 loads secrets from `.env` (**NOT committed**)
 - 🗃️ writes results to SQLite (`runs/backtests.sqlite`)
-- 🚦 evaluates gates **G0–G5** from JSON configs in `gates/`
+- 🚦 evaluates gates **G0–G5** from JSON configs in `gates/` ()
 
 This repo is currently focused on **plumbing correctness + gate evaluation**, not “final strategy alpha.”
 
@@ -14,7 +14,7 @@ This repo is currently focused on **plumbing correctness + gate evaluation**, no
 
 `multigate.py`:
 
-1. 📥 reads SPY 5m data from `paths.data_path` in `config.yaml`
+1. 📥 reads data from `paths.data_path` in `config.yaml`
 2. 🕒 normalizes timestamps and (optionally) enforces RTH rules from config
 3. 🧱 generates a minimal `signals` + `trades` stream for the run
 4. 🧪 evaluates each gate (G0–G5) and logs per‑signal decisions
@@ -24,7 +24,7 @@ This repo is currently focused on **plumbing correctness + gate evaluation**, no
 ## 🧰 Requirements
 
 - Python 3.x
-- `sqlite3` available on your system (macOS has it)
+- `sqlite3` 
 - packages in `requirements.txt`
 
 Install:
@@ -150,15 +150,13 @@ ORDER BY gate_id, n DESC;
 
 ## 📝 Notes
 
-### Why you saw `G1_current_frozen.json` earlier
-
-That was a “pinned/frozen” naming convention from an earlier iteration (a safety guard so G1 didn’t get edited accidentally during experimentation).
-
-This repo standardizes on:
-
-- ✅ `gates/G1.json`
-
-If you renamed it, make sure any remaining references (code/docs) also point to `gates/G1.json`.
+- **Single source of truth:** edit `config.yaml` (paths, runtime toggles, gate IDs).
+- **Secrets:** put API keys in `.env` (never commit it). Copy `.env.example → .env`.
+- **Time handling:** timestamps are parsed as **UTC**, then converted to `runtime.timezone` (default `America/New_York`).
+- **RTH filter:** if `runtime.enforce_rth: true`, entries are restricted to `09:45–16:00` ET (see `runtime.rth_start` / `runtime.rth_end`).
+- **Gates:** configs live in `gates/G0.json … gates/G5.json`. Repo standard is **`gates/G1.json`** (no `G1_current_frozen.json`).
+- **Run outputs:** the SQLite DB writes to `runs/backtests.sqlite` and optional charts/reports go under `runs/artifacts/` (typically local-only).
+- **Repro tip:** if results look “off,” double-check `paths.data_path`, timezone, and RTH settings first.
 
 
 ## 🗂️ Repo layout
@@ -171,12 +169,18 @@ If you renamed it, make sure any remaining references (code/docs) also point to 
 - `legacy/` — old sqlite files, old reports, old charts, etc.
 
 
-## 🧹 Local‑only / large files (recommended)
+## 🧹 Local-only / large files (recommended)
 
 Keep these out of GitHub (typically via `.gitignore`):
 
 - `.venv/`
-- `runs/backtests.sqlite` (usually)
-- `data/raw/` and `data/processed/` (usually)
+- `__pycache__/`
+- `.env`
+- `runs/` (SQLite DB + generated artifacts)
+- `data/` (raw + processed market data)
+- `google_drive/` (downloaded exports)
+- `legacy/` (optional: keep local unless you want history in the repo)
+- `artifacts/` (only if this folder is generated output)
+- `.DS_Store`
 
 See `.gitignore` for the intended policy.
