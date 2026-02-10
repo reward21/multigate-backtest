@@ -191,22 +191,32 @@ def write_run_report_md(
 
     if run_row:
         md.append("## Run metadata\n")
-            for k in meta_keys:
-        v = run_row.get(k)
 
-        # clean up timestamps (remove microseconds / long ISO)
-        if k == "created_at_utc" and v:
-            v = f"{_fmt_ts_col(v, tz='UTC', fmt='%Y-%m-%d %H:%M')} UTC"
+        # Keep this list small and predictable for report readability
+        meta_keys = (
+            "created_at_utc",
+            "date_start_et",
+            "date_end_et",
+            "params_json",
+            "report_path",
+        )
 
-        elif k in ("date_start_et", "date_end_et") and v:
-            v_fmt = _fmt_ts_col(v, tz="America/New_York", fmt="%Y-%m-%d %H:%M")
-            # if it's midnight, show date only
-            if v_fmt.endswith("00:00"):
-                v = v_fmt.split()[0]
-            else:
-                v = f"{v_fmt} ET"
+        for k in meta_keys:
+            v = run_row.get(k)
 
-        md.append(f"- **{k}**: `{v}`")
+            # clean up timestamps (remove microseconds / long ISO)
+            if k == "created_at_utc" and v:
+                v = f"{_fmt_ts_col(v, tz='UTC', fmt='%Y-%m-%d %H:%M')} UTC"
+
+            elif k in ("date_start_et", "date_end_et") and v:
+                v_fmt = _fmt_ts_col(v, tz="America/New_York", fmt="%Y-%m-%d %H:%M")
+                # if it's midnight, show date only
+                if isinstance(v_fmt, str) and v_fmt.endswith("00:00"):
+                    v = v_fmt.split()[0]
+                else:
+                    v = f"{v_fmt} ET"
+
+            md.append(f"- **{k}**: `{v}`")
 
     # Denial reasons
     if not denial.empty:

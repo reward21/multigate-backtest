@@ -25,6 +25,10 @@ from typing import Optional, Tuple, Union, Iterable
 
 import pandas as pd
 
+import json
+from datetime import datetime, timezone
+from hashlib import sha256
+
 
 PathLike = Union[str, Path]
 
@@ -178,6 +182,53 @@ def write_parquet(df: pd.DataFrame, out_path: PathLike) -> Path:
 
 
 # ---------------------------
+# Ingested layout helpers
+# ---------------------------
+
+def _sha256_file(p: Path) -> str:
+    h = sha256()
+    with p.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_source_json(payload: dict, out_path: PathLike) -> Path:
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return out
+
+
+def _build_vix_output_basename(*, symbol: str, provider: str, schema: str) -> str:
+    # Example: vix-fred-vixcls-daily
+    return f"{symbol.lower()}-{provider.lower()}-{schema.lower()}"
+
+
+def plan_ingested_vix_paths(
+    *,
+    ingested_root: PathLike = Path("data/ingested"),
+    symbol: str = "vix",
+    provider: str,
+    schema: str = "daily",
+) -> tuple[Path, Path, str]:
+    """Plan canonical ingested paths for VIX parquet + source.json.
+
+    Canonical layout:
+        <ingested_root>/vix/<provider>-<schema>/
+
+    Files:
+        <symbol>-<provider>-<schema>.parquet
+        <symbol>-<provider>-<schema>.source.json
+    """
+    root = Path(ingested_root).expanduser().resolve() / symbol.lower() / f"{provider.lower()}-{schema.lower()}"
+    base = _build_vix_output_basename(symbol=symbol, provider=provider, schema=schema)
+    parquet_path = root / f"{base}.parquet"
+    source_path = root / f"{base}.source.json"
+    return parquet_path, source_path, base
+
+
+# ---------------------------
 # Public loaders
 # ---------------------------
 
@@ -253,3 +304,105 @@ def ingest_vix_to_parquet(
         cboe_out = write_parquet(cboe_df, out_cboe_parquet)
 
     return fred_out, cboe_out
+
+
+# ---------------------------
+# Ingested layout entrypoint
+# ---------------------------
+
+def ingest_vix_auto_ingested(
+    *,
+    raw_root: PathLike = Path("data/raw/vix"),
+    ingested_root: PathLike = Path("data/ingested"),
+    include_cboe: bool = True,
+    overwrite: bool = False,
+) -> dict:
+    """Ingest VIX CSV sources into the canonical ingested layout.
+
+    Reads:
+      - <raw_root>/source/VIXCLS_FRED.csv
+      - <raw_root>/source/VIX_History_CBOE.csv (optional)
+
+    Writes:
+      - <ingested_root>/vix/fred-daily/vix-fred-daily.parquet + .source.json
+      - <ingested_root>/vix/cboe-daily/vix-cboe-daily.parquet + .source.json (if present)
+
+    Returns a dict with created/updated artifact paths.
+    """
+    raw_root = Path(raw_root)
+    src_dir = raw_root / "source"
+
+    fred_csv = src_dir / "VIXCLS_FRED.csv"
+    cboe_csv = src_dir / "VIX_History_CBOE.csv"
+
+    if not fred_csv.exists():
+        raise FileNotFoundError(f"Missing FRED CSV: {fred_csv}")
+
+    results: dict = {}
+
+    # --- FRED ---
+    fred_parquet, fred_source, _ = plan_ingested_vix_paths(
+        ingested_root=ingested_root,
+        provider="fred",
+        schema="daily",
+    )
+
+    if overwrite or not fred_parquet.exists():
+        fred_df = load_fred_vix_csv(fred_csv)
+        write_parquet(fred_df, fred_parquet)
+
+        payload = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "symbol": "vix",
+            "provider": "fred",
+            "schema": "daily",
+            "inputs": {
+                "csv": str(fred_csv),
+                "sha256": _sha256_file(fred_csv),
+            },
+            "output": {
+                "parquet": str(fred_parquet),
+                "rows": int(len(fred_df)),
+                "min_date": fred_df["date"].min().isoformat() if len(fred_df) else None,
+                "max_date": fred_df["date"].max().isoformat() if len(fred_df) else None,
+                "columns": list(fred_df.columns),
+            },
+        }
+        write_source_json(payload, fred_source)
+
+    results["fred"] = {"parquet": str(fred_parquet), "source_json": str(fred_source)}
+
+    # --- CBOE (optional) ---
+    if include_cboe and cboe_csv.exists():
+        cboe_parquet, cboe_source, _ = plan_ingested_vix_paths(
+            ingested_root=ingested_root,
+            provider="cboe",
+            schema="daily",
+        )
+
+        if overwrite or not cboe_parquet.exists():
+            cboe_df = load_cboe_vix_file(cboe_csv)
+            write_parquet(cboe_df, cboe_parquet)
+
+            payload = {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "symbol": "vix",
+                "provider": "cboe",
+                "schema": "daily",
+                "inputs": {
+                    "csv": str(cboe_csv),
+                    "sha256": _sha256_file(cboe_csv),
+                },
+                "output": {
+                    "parquet": str(cboe_parquet),
+                    "rows": int(len(cboe_df)),
+                    "min_date": cboe_df["date"].min().isoformat() if len(cboe_df) else None,
+                    "max_date": cboe_df["date"].max().isoformat() if len(cboe_df) else None,
+                    "columns": list(cboe_df.columns),
+                },
+            }
+            write_source_json(payload, cboe_source)
+
+        results["cboe"] = {"parquet": str(cboe_parquet), "source_json": str(cboe_source)}
+
+    return results

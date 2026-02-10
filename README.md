@@ -9,6 +9,8 @@ A small, hackable **multi‑gate backtest harness** that:
 
 This repo is currently focused on **plumbing correctness + gate evaluation**, not “final strategy alpha.”
 
+> 🐍 **Use a virtual environment.** This repo expects you to run everything from an activated `.venv` (see **Requirements** below).
+
 
 ## ✅ What it does
 
@@ -23,7 +25,7 @@ This repo is currently focused on **plumbing correctness + gate evaluation**, no
 
 ## 🧰 Requirements
 
-- Python 3.x
+- Python 3.12+ (recommended)
 - `sqlite3` 
 - packages in `requirements.txt`
 
@@ -55,21 +57,17 @@ Common knobs:
 
 ### 2) `.env` (🔐 NOT committed ❌)
 
-Secrets go here (API keys/tokens). The repo includes `.env.example`.
+Secrets (API keys/tokens) belong in `.env` and must **never** be committed.
 
-Create your real `.env`:
+Setup:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env` and set (examples):
+Then edit `.env` and add your keys.
 
-- `ALPACA_KEY_ID=...`
-- `ALPACA_SECRET_KEY=...`
-- `WEBULL_ACCESS_TOKEN=...`
-
-✅ `.env` should be listed in `.gitignore` so it never gets pushed.
+✅ Make sure `.env` is in `.gitignore` so it cannot be pushed.
 
 
 ## ▶️ Run
@@ -85,6 +83,13 @@ You should see something like:
 
 - `✅ Completed run_id=...`
 - `DB: /.../runs/backtests.sqlite`
+
+
+## 📥 Data ingestion
+
+This repo includes an ingestion pipeline for Databento, Alpaca, and VIX.
+
+For details and examples, see `docs/Ingest_readme.md`.
 
 
 ## 🗃️ DB tables you should expect

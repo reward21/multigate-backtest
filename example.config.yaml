@@ -35,11 +35,18 @@ data_features:
   compute_vix_regime: true
   attach_features_json: true
 
+# Put your keys here for local testing, or store them in a .env and load them at runtime.
 api:
   alpaca:
     enabled: false
-    key_id_env: "ALPACA_KEY_ID"
-    secret_key_env: "ALPACA_SECRET_KEY"
+    
+    key_id: "<YOUR_ALPACA_KEY_ID_HERE>"
+    secret_key: "<YOUR_ALPACA_SECRET_KEY_HERE>"
+
   webull:
     enabled: false
-    access_token_env: "WEBULL_ACCESS_TOKEN"
+    access_token: "<YOUR_WEBULL_ACCESS_TOKEN_HERE>"
+
+  databento:
+    enabled: false
+    api_key: "<YOUR_DATABENTO_API_KEY_HERE>"

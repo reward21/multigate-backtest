@@ -1,0 +1,166 @@
+
+
+# example.ingest.yaml
+#
+# Purpose:
+#   Example configuration for `python -m scripts.ingest`.
+#
+# Notes:
+#   - `enabled: false` means the source is skipped entirely.
+#   - `source.mode` is the default mode for that source.
+#   - Each job can optionally override with `job.mode`.
+#   - For API jobs, you can enable safety guardrails:
+#       - print_cost: true
+#       - require_confirm: true
+#       - max_cost_usd: <float>
+#
+# Typical usage:
+#   cp example.ingest.yaml ingest.yaml
+#   python -m scripts.ingest
+
+# Optional defaults used by the dispatcher (if your scripts/ingest.py supports them).
+# These are safe to keep even if unused.
+paths:
+  raw_root: data/raw
+  ingested_root: data/ingested
+
+sources:
+  # ------------------------------------------------------------
+  # DATABENTO
+  #   - offline: converts a local Databento download folder (.dbn.zst + JSON sidecars)
+  #   - api: downloads a small range via API into raw/, then converts into ingested/
+  # ------------------------------------------------------------
+  databento:
+    enabled: true
+    mode: offline  # default mode for this source: offline | api
+
+    jobs:
+      # -----------------------
+      # OFFLINE JOB (example)
+      # -----------------------
+      - name: spy_ohlcv_1m_offline
+        mode: offline
+        raw_dir: data/raw/databento/spy/arcx-ohlcv-1m/ARCX-YYYYMMDD-<FOLDER_ID>
+        filename_contains: ohlcv-1m
+        overwrite: false
+        compute_raw_sha256: true
+
+      # -----------------------
+      # API JOB (example)
+      # -----------------------
+      - name: spy_ohlcv_1m_api_smoke
+        mode: api
+        overwrite: true
+
+        # Databento API request
+        api:
+          dataset: ARCX.PILLAR
+          schema: ohlcv-1m
+          symbols: [SPY]
+          start: "2026-02-06"
+          end:   "2026-02-07"
+          limit: 200
+
+          # Safety guardrails
+          print_cost: true          # prints estimated USD cost before download
+          require_confirm: true     # forces you to type 'y' to proceed
+          max_cost_usd: 0.05        # optional cap. omit or set 0 to disable
+
+        # Optional: choose how raw API downloads are stored.
+        # If your ingest_databento.py supports it, keep this on.
+        save_raw:
+          enabled: true
+          # Folder is created under data/raw/databento/<symbol>/<dataset-schema>/<job-name>/
+
+
+  # ------------------------------------------------------------
+  # ALPACA
+  #   - offline: converts a local parquet sample into ingested/
+  #   - api: pulls bars from the Alpaca Market Data API
+  # ------------------------------------------------------------
+  alpaca:
+    enabled: true
+    mode: api  # offline | api
+
+    # Optional defaults for this source
+    defaults:
+      feed: iex          # iex | sip (if your account supports it)
+      adjustment: raw    # raw | split | dividend | all (depending on endpoint)
+
+    jobs:
+      # -----------------------
+      # OFFLINE JOB (example)
+      # -----------------------
+      - name: spy_5m_offline
+        mode: offline
+        overwrite: true
+
+        offline:
+          parquet: data/raw/alpaca/spy_5m.parquet
+          symbol: SPY
+          timeframe: 5min
+
+      # -----------------------
+      # API JOB (example)
+      # -----------------------
+      - name: tsla_5m_api_smoke
+        mode: api
+        overwrite: true
+
+        api:
+          symbol: TSLA
+          timeframe: 5min
+          start: "2026-02-06"
+          end:   "2026-02-07"
+          limit: 10000
+
+          # Optional request knobs
+          feed: iex
+          adjustment: raw
+
+          # Optional raw payload capture + integrity
+          save_raw_payload: true
+          compute_raw_sha256: true
+
+
+  # ------------------------------------------------------------
+  # VIX
+  #   - offline: derives Parquet from raw CSV sources (FRED + CBOE)
+  # ------------------------------------------------------------
+  vix:
+    enabled: false
+    mode: offline
+
+    jobs:
+      - name: vix_daily
+        mode: offline
+        overwrite: false
+
+        # Optional provider toggles if your ingest_vix.py supports them
+        providers:
+          fred: true
+          cboe: true
+
+        # Optional: raw CSV locations (leave blank if the script downloads them)
+        raw:
+          fred_csv: data/raw/vix/fred_vix_daily.csv
+          cboe_csv: data/raw/vix/cboe_vix_daily.csv
+
+        compute_raw_sha256: true
+
+
+# ------------------------------------------------------------
+# Adding a NEW SOURCE later (template)
+# ------------------------------------------------------------
+# sources:
+#   my_new_vendor:
+#     enabled: true
+#     mode: offline
+#     jobs:
+#       - name: example_job
+#         mode: offline
+#         overwrite: false
+#         offline:
+#           raw_dir: data/raw/my_new_vendor/... 
+#         # api:
+#         #   ... vendor-specific fields ...

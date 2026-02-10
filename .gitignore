@@ -1,57 +1,102 @@
-cat > .gitignore <<'EOF'
-# Python bytecode
+# -------------------------
+# Python
+# -------------------------
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 .Python
 
+# -------------------------
 # macOS
+# -------------------------
 .DS_Store
+**/.DS_Store
 
+# -------------------------
 # IDE / editor
+# -------------------------
 .vscode/
 .idea/
+*.code-workspace
 
+# -------------------------
 # Virtualenv
+# -------------------------
 .venv/
 venv/
 ENV/
 env/
 
+# -------------------------
 # Secrets (NEVER commit)
+# -------------------------
 .env
 
+
+# -------------------------
+# configs/yaml's /.yaml root files only
+# -------------------------
+/config.yaml
+/ingest.yaml
+
+# -------------------------
 # Data
-# Ignore CSV/Parquet by default (prevents accidental huge commits)
-*.csv
-*.parquet
+# Ignore ALL data by default.
+# Allow only sample datasets under:
+#   data/raw/sample/
+#   data/ingested/sample/
+# -------------------------
 
-# …but DO commit the sample dataset under /data
-!data/**/*.csv
-!data/**/*.parquet
+# Ignore everything under data/
+data/**
 
-# Generated runs/artifacts
+# Re-open parent dirs so Git can see the allowlisted sample folders
+!data/
+!data/raw/
+!data/ingested/
+
+# Keep raw ignored except sample
+data/raw/**
+!data/raw/sample/
+!data/raw/sample/**
+
+# Keep ingested ignored except sample
+data/ingested/**
+!data/ingested/sample/
+!data/ingested/sample/**
+
+# (Optional) If you later add processed/ again, it is already covered by data/**.
+
+# -------------------------
+# Sandboxes / experiments
+# -------------------------
+scripts/dbn.py
+
+
+# -------------------------
+# Generated outputs
+# -------------------------
 runs/
 artifacts/
-
-# Backtests legacy outputs
 legacy/
 
+# -------------------------
 # Databases
+# -------------------------
 *.sqlite
 *.sqlite3
 
+# -------------------------
 # Archives / media outputs
+# -------------------------
 *.zip
 *.png
 *.jpg
 *.jpeg
 *.pdf
 
-# private docs/archives
+# -------------------------
+# Private docs/archives
+# -------------------------
 /gc_docs
-EOF
-
-.DS_Store
-**/.DS_Store
