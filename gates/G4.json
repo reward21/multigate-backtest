@@ -19,8 +19,8 @@
     "REENTRY_BLOCK",
     "AVG_DOWN_BLOCK"
   ],
-  "gate_id": "G5",
-  "name": "Strict Tail-Risk Gate",
+  "gate_id": "G4",
+  "name": "Balanced Tail-Risk Gate",
   "rules": {
     "avg_down_policy": {
       "enabled": true,
@@ -28,11 +28,11 @@
     },
     "cooldown_minutes_after_stop": {
       "enabled": true,
-      "minutes": 30
+      "minutes": 20
     },
     "daily_kill_switch": {
       "enabled": true,
-      "max_intraday_dd_pct": 1.0
+      "max_intraday_dd_pct": 1.2
     },
     "denial_reason_map": "CANONICAL_1TO1",
     "liquidity_filters": {
@@ -43,7 +43,7 @@
     },
     "max_consecutive_losses": {
       "enabled": true,
-      "max_losses": 2
+      "max_losses": 4
     },
     "max_open_positions": {
       "enabled": true,
@@ -51,15 +51,15 @@
     },
     "max_trades_per_day": {
       "enabled": true,
-      "max_trades": 3
+      "max_trades": 5
     },
     "overnight_block": {
       "enabled": true
     },
     "per_trade_risk_cap": {
       "enabled": true,
-      "max_risk_pct_equity": 1.5,
-      "max_units": null
+      "max_risk_pct_equity": 0.5,
+      "max_units": 600
     },
     "reentry_policy": {
       "enabled": true,
@@ -77,7 +77,7 @@
         "LOW",
         "NORMAL"
       ],
-      "enabled": false
+      "enabled": true
     }
   }
 }

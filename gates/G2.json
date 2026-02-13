@@ -27,12 +27,12 @@
       "mode": "DISALLOW"
     },
     "cooldown_minutes_after_stop": {
-      "enabled": false,
-      "minutes": 0
+      "enabled": true,
+      "minutes": 5
     },
     "daily_kill_switch": {
       "enabled": true,
-      "max_intraday_dd_pct": 2.0
+      "max_intraday_dd_pct": 1.5
     },
     "denial_reason_map": "CANONICAL_1TO1",
     "liquidity_filters": {
@@ -42,24 +42,24 @@
       "min_volume": null
     },
     "max_consecutive_losses": {
-      "enabled": false,
-      "max_losses": 999
+      "enabled": true,
+      "max_losses": 6
     },
     "max_open_positions": {
       "enabled": true,
       "max_positions": 1
     },
     "max_trades_per_day": {
-      "enabled": false,
-      "max_trades": 999
+      "enabled": true,
+      "max_trades": 8
     },
     "overnight_block": {
       "enabled": true
     },
     "per_trade_risk_cap": {
       "enabled": true,
-      "max_risk_pct_equity": 2.0,
-      "max_units": null
+      "max_risk_pct_equity": 0.3,
+      "max_units": 900
     },
     "reentry_policy": {
       "enabled": false,

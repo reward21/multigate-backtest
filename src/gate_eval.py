@@ -4,7 +4,7 @@ import json
 import sqlite3
 from datetime import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -14,11 +14,18 @@ ET_TZ = "America/New_York"
 CANONICAL_DENIAL_CODES = [
     "RISK_DAILY_KILL","RISK_PER_TRADE_CAP","RISK_OVERSIZE","RISK_MAX_TRADES","RISK_LOSS_STREAK","RISK_COOLDOWN",
     "SESSION_PRE_945","SESSION_POST_300","SESSION_FORCE_FLAT","VOL_VIX_BLOCK","LIQ_SPREAD","LIQ_VOLUME","LIQ_OPEN_INTEREST",
-    "ADD_TO_LOSER_BLOCK","OVERNIGHT_BLOCK","REENTRY_BLOCK","AVG_DOWN_BLOCK"
+    "ADD_TO_LOSER_BLOCK","OVERNIGHT_BLOCK","REENTRY_BLOCK","AVG_DOWN_BLOCK","DATA_MISSING_TRADE"
 ]
 
 def _t(hhmmss: str) -> time:
-    hh, mm, ss = [int(x) for x in hhmmss.split(":")]
+    parts = [int(x) for x in hhmmss.split(":")]
+    if len(parts) == 2:
+        hh, mm = parts
+        ss = 0
+    elif len(parts) == 3:
+        hh, mm, ss = parts
+    else:
+        raise ValueError(f"Expected HH:MM or HH:MM:SS, got {hhmmss!r}")
     return time(hh, mm, ss)
 
 def ensure_tables(conn: sqlite3.Connection) -> None:
@@ -169,19 +176,50 @@ def load_gate_pack(gates_dir: Path, gate_ids: List[str]) -> Dict[str, Dict]:
             f = gates_dir / "G1.json"
         else:
             f = gates_dir / f"{gid}.json"
-        out[gid] = load_gate_config(f)
+        cfg = load_gate_config(f)
+        if str(cfg.get("gate_id", "")).strip() != gid:
+            raise ValueError(f"Gate config mismatch: file={f.name} expected gate_id={gid} got={cfg.get('gate_id')!r}")
+        out[gid] = cfg
+    _validate_gate_pack(out)
     return out
+
+
+def _rules_fingerprint(rules: Dict[str, Any]) -> str:
+    return json.dumps(rules or {}, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _validate_gate_pack(gates: Dict[str, Dict[str, Any]]) -> None:
+    by_fp: Dict[str, List[str]] = {}
+    for gid, cfg in gates.items():
+        rules = cfg.get("rules", {}) if isinstance(cfg, dict) else {}
+        if not isinstance(rules, dict):
+            raise ValueError(f"Gate {gid} has invalid rules payload (expected object).")
+        risk_rule = rules.get("per_trade_risk_cap", {})
+        if isinstance(risk_rule, dict) and bool(risk_rule.get("enabled", False)):
+            max_units = risk_rule.get("max_units")
+            if max_units is None or float(max_units) <= 0:
+                raise ValueError(
+                    f"Gate {gid} has per_trade_risk_cap.enabled=true but max_units is missing/invalid. "
+                    "Containment pass requires a positive max_units cap."
+                )
+        fp = _rules_fingerprint(rules)
+        by_fp.setdefault(fp, []).append(gid)
+
+    dup_groups = [sorted(v) for v in by_fp.values() if len(v) > 1]
+    if dup_groups:
+        merged = "; ".join(",".join(g) for g in dup_groups)
+        raise ValueError(f"Duplicate gate rule sets detected (containment block): {merged}")
 
 def _is_in_session(ts_et: pd.Timestamp, rules: Dict) -> Tuple[bool, Optional[str]]:
     if not rules.get("enabled", False):
         return True, None
     t = ts_et.timetz()
+    if t >= _t(rules["force_flat_at"]):
+        return False, "SESSION_FORCE_FLAT"
     if t < _t(rules["no_entry_before"]):
         return False, "SESSION_PRE_945"
     if t > _t(rules["no_new_entry_after"]):
         return False, "SESSION_POST_300"
-    if t >= _t(rules["force_flat_at"]):
-        return False, "SESSION_FORCE_FLAT"
     return True, None
 
 def _vix_ok(vix_regime: str, rule: Dict) -> Tuple[bool, Optional[str]]:
@@ -229,9 +267,9 @@ def evaluate_gates(
     cur = conn.cursor()
 
     signals = pd.read_sql_query("SELECT * FROM signals WHERE run_id=? ORDER BY ts", conn, params=(run_id,))
-    trades = pd.read_sql_query("SELECT * FROM trades WHERE run_id=? ORDER BY entry_ts", conn, params=(run_id,))
-    trades = trades.set_index("signal_id", drop=False)
-    if signals.empty or trades.empty:
+    base_trades = pd.read_sql_query("SELECT * FROM trades WHERE run_id=? ORDER BY entry_ts", conn, params=(run_id,))
+    base_trades = base_trades.set_index("signal_id", drop=False)
+    if signals.empty or base_trades.empty:
         raise RuntimeError(f"run_id {run_id} missing signals/trades; cannot evaluate gates.")
 
     signals = signals.set_index("signal_id", drop=False)
@@ -273,8 +311,14 @@ def evaluate_gates(
 
         for _, sig in signals.iterrows():
             signal_id = sig["signal_id"]
-            ts = pd.to_datetime(sig["ts"])
-            ts_et = ts.tz_convert(ET_TZ) if ts.tzinfo is not None else ts.tz_localize("UTC").tz_convert(ET_TZ)
+            ts = pd.to_datetime(sig["ts"], errors="coerce", utc=True)
+            if pd.isna(ts):
+                cur.execute(
+                    "INSERT OR REPLACE INTO gate_decisions(run_id, gate_id, signal_id, decision, denial_code, denial_detail, equity_at_decision, risk_at_decision, ts) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (run_id, gid, signal_id, "FAIL", "ENGINE_CONSTRAINT", "invalid signal timestamp", float(equity), None, "")
+                )
+                continue
+            ts_et = ts.tz_convert(ET_TZ)
             session_date = sig["session_date"] or str(ts_et.date())
             vix_regime = sig["vix_regime"] or "UNKNOWN"
 
@@ -331,7 +375,7 @@ def evaluate_gates(
                 continue
 
             try:
-                sh = trades.loc[signal_id]
+                sh = base_trades.loc[signal_id]
             except KeyError:
                 cur.execute(
                     "UPDATE gate_decisions SET decision=?, denial_code=?, denial_detail=? WHERE run_id=? AND gate_id=? AND signal_id=?",
@@ -423,10 +467,10 @@ def evaluate_gates(
         if daily_rows:
             pd.DataFrame(daily_rows).to_sql("gate_daily_stats", conn, if_exists="append", index=False)
 
-        trades = pd.read_sql_query("SELECT * FROM trades_pass WHERE run_id=? AND gate_id=? ORDER BY entry_ts", conn, params=(run_id,gid))
-        trades = trades.set_index("signal_id", drop=False)
-        m = compute_trade_metrics(trades)
-        eq = equity_curve_from_trades(trades, start_equity)
+        gate_trades = pd.read_sql_query("SELECT * FROM trades_pass WHERE run_id=? AND gate_id=? ORDER BY entry_ts", conn, params=(run_id,gid))
+        gate_trades = gate_trades.set_index("signal_id", drop=False)
+        m = compute_trade_metrics(gate_trades)
+        eq = equity_curve_from_trades(gate_trades, start_equity)
         maxdd = max_drawdown(eq)
         daily = pd.DataFrame(daily_rows) if daily_rows else pd.DataFrame(columns=["pnl_day"])
         worst_day = float(daily["pnl_day"].min()) if not daily.empty else 0.0
