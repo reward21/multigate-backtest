@@ -34,7 +34,16 @@ def ensure_tables(conn: sqlite3.Connection) -> None:
       strategy_version TEXT,
       spec_version TEXT,
       created_utc TEXT,
-      notes TEXT
+      notes TEXT,
+      created_at_utc TEXT,
+      synthetic_data INTEGER,
+      date_start_et TEXT,
+      date_end_et TEXT,
+      params_json TEXT,
+      metrics_json TEXT,
+      report_path TEXT,
+      equity_curve_path TEXT,
+      pnl_hist_path TEXT
     );
 
     CREATE TABLE IF NOT EXISTS signals(
@@ -125,6 +134,29 @@ def ensure_tables(conn: sqlite3.Connection) -> None:
       PRIMARY KEY (run_id, gate_id)
     );
     """)
+
+    # Minimal forward/backward compatibility for previously created DBs.
+    def ensure_columns(table: str, columns: Dict[str, str]) -> None:
+        existing = {r[1] for r in cur.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns.items():
+            if name not in existing:
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+    ensure_columns("runs", {
+        "created_at_utc": "TEXT",
+        "synthetic_data": "INTEGER",
+        "date_start_et": "TEXT",
+        "date_end_et": "TEXT",
+        "params_json": "TEXT",
+        "metrics_json": "TEXT",
+        "report_path": "TEXT",
+        "equity_curve_path": "TEXT",
+        "pnl_hist_path": "TEXT",
+    })
+    ensure_columns("signals", {
+        "direction": "INTEGER",
+        "features_json": "TEXT",
+    })
     conn.commit()
 
 def load_gate_config(path: Path) -> Dict:

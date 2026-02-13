@@ -4,6 +4,25 @@ from __future__ import annotations
 
 from pathlib import Path
 import sqlite3
+import os
+
+
+def _configure_matplotlib_runtime(out_path: Path) -> None:
+    """
+    Ensure matplotlib uses a writable cache/config directory and a headless backend.
+    This avoids startup stalls and permission warnings in restricted environments.
+    """
+    current = os.environ.get("MPLCONFIGDIR", "").strip()
+    if current and os.access(current, os.W_OK):
+        target = Path(current)
+    else:
+        target = out_path.parent.parent / ".mplconfig"
+        target.mkdir(parents=True, exist_ok=True)
+        os.environ["MPLCONFIGDIR"] = str(target)
+
+    # Force headless backend for batch chart generation.
+    import matplotlib
+    matplotlib.use("Agg", force=True)
 
 
 def write_equity_curve_png(
@@ -23,6 +42,9 @@ def write_equity_curve_png(
     """
 
     import pandas as pd
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    _configure_matplotlib_runtime(out_path)
     import matplotlib.pyplot as plt
 
     q = f"SELECT {ts_col} AS ts, {pnl_col} AS pnl FROM {table} WHERE run_id=? ORDER BY {ts_col}"
@@ -40,9 +62,6 @@ def write_equity_curve_png(
         return
 
     df["equity"] = float(start_equity) + df["pnl"].cumsum()
-
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     plt.figure()
     plt.plot(df["ts"], df["equity"])

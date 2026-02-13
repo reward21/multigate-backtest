@@ -152,6 +152,36 @@ ORDER BY gate_id, n DESC;
 "
 ```
 
+## 🗄️ SQLite explorer (query + visual UI)
+
+This repo includes `scripts/db_tool.py` for clean DB access.
+
+Terminal queries:
+
+```bash
+python scripts/db_tool.py tables
+python scripts/db_tool.py recent-runs --limit 10
+python scripts/db_tool.py query --sql "SELECT * FROM gate_metrics ORDER BY run_id DESC LIMIT 20;"
+python scripts/db_tool.py schema trades_pass
+```
+
+Browser UI:
+
+```bash
+python scripts/db_tool.py web --host 127.0.0.1 --port 8765
+```
+
+Then open `http://127.0.0.1:8765` to browse tables, inspect schema, and run read-only SQL interactively.
+
+Quick highlights:
+- One-click presets (`Latest Run`, `Gate Health`, `Denials`, `PnL Drilldown`) and human views for trades/signals/gate diagnostics.
+- Responsive layout with resizable panes, wrapped/scrollable SQL and JSON containers, and a right-side insights panel.
+- Local Ollama analysis with persistent memory (`runs/llm_memory.sqlite`) and recall by `run_id`.
+
+Full docs:
+- UI quick guide: `docs/ui_readme.md`
+- Developer docs (API, architecture, memory schema, troubleshooting): `docs/sqlite_explorer_dev_docs.md`
+
 
 ## 📝 Notes
 

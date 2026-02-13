@@ -46,6 +46,9 @@ from decimal import Decimal
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# Ensure `src.*` imports resolve when executed as `python scripts/ingest.py`.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Load repo-root .env so API-mode ingests can see credentials when run via `python -m scripts.ingest`.
 # NOTE: Python does NOT automatically load .env files.
